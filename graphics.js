@@ -60,20 +60,20 @@ graphics.generateImages = (styles, size = 20) => {
   }
 };
 
-graphics.generateTransCanvas = (styles, radius, size = 20) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = size + 10;
-  canvas.height = size + 10;
-  const pLoc = [canvas.width / 2, canvas.height / 2];
+// graphics.generateTransCanvas = (styles, radius, size = 20) => {
+//   const canvas = document.createElement("canvas");
+//   canvas.width = size + 10;
+//   canvas.height = size + 10;
+//   const pLoc = [canvas.width / 2, canvas.height / 2];
 
-  const ctx = canvas.getContext("2d");
-  const grd = ctx.createRadialGradient(...pLoc, 0, ...pLoc, radius);
-  grd.addColorStop(0, "white");
-  grd.addColorStop(1, "rgba(255,255,255,0)");
-  graphics.drawPoint(ctx, pLoc, grd, radius * 2);
-  styles["transparent"] = new Image();
-  styles["transparent"].src = canvas.toDataURL();
-};
+//   const ctx = canvas.getContext("2d");
+//   const grd = ctx.createRadialGradient(...pLoc, 0, ...pLoc, radius);
+//   grd.addColorStop(0, "white");
+//   grd.addColorStop(1, "rgba(255,255,255,0)");
+//   graphics.drawPoint(ctx, pLoc, grd, radius * 2);
+//   styles["transparent"] = new Image();
+//   styles["transparent"].src = canvas.toDataURL();
+// };
 
 graphics.drawImage = (ctx, image, loc) => {
   ctx.beginPath();

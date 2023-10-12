@@ -11,6 +11,12 @@ class Chart {
     this.canvas.height = options.size;
     this.canvas.style = "background-color:white;";
     container.appendChild(this.canvas);
+    // transparent canvas over chart canvas
+    this.trans = document.createElement("canvas");
+    this.trans.width = options.size;
+    this.trans.height = options.size;
+    this.trans.style = "position:absolute;left:0;top:0;z-index:2;";
+    // container.appendChild(this.trans);
 
     this.ctx = this.canvas.getContext("2d");
     this.margin = options.size * 0.1;
@@ -59,7 +65,7 @@ class Chart {
         );
         const newOffset = math.add(dataTrans.offset, dragInfo.offset);
         this.#updateDataBounds(newOffset, dataTrans.scale);
-        this.#draw();
+        // this.#draw();
       }
       const pLoc = this.#getMouse(evt);
       const pPoints = this.samples.map((s) =>
@@ -70,10 +76,10 @@ class Chart {
       const dist = math.distance(pPoints[index], pLoc);
       if (dist < this.margin / 2) {
         this.hoveredSample = nearest;
-        const { ctx, dataBounds, pixelBounds } = this;
-        const pLoc = math.remapPoint(dataBounds, pixelBounds, nearest.point);
-        graphics.drawImage(ctx, this.styles.transparent, pLoc);
-        this.#drawSamples([nearest]);
+        // const { ctx, dataBounds, pixelBounds } = this;
+        // const pLoc = math.remapPoint(dataBounds, pixelBounds, nearest.point);
+        // graphics.drawImage(ctx, this.styles.transparent, pLoc);
+        // this.#drawSamples([nearest]);
       } else {
         this.hoveredSample = null;
         // this.#draw();
