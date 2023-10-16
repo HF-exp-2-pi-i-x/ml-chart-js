@@ -123,11 +123,15 @@ class Chart {
     canvas.onwheel = (evt) => {
       const dir = Math.sign(evt.deltaY);
       const step = 0.02;
-      dataTrans.scale += dir * step;
-      dataTrans.scale = Math.max(step, Math.min(2, dataTrans.scale));
+      // dataTrans.scale += dir * step;
+      // dataTrans.scale = Math.max(step, Math.min(2, dataTrans.scale));
+      const scale = 1 + dir * step;
+      dataTrans.scale *= scale;
 
       this.#updateDataBounds(dataTrans.offset, dataTrans.scale);
       this.#draw();
+      this.#drawOverlay();
+
       evt.preventDefault();
     };
     canvas.onclick = () => {
@@ -147,6 +151,7 @@ class Chart {
         this.onClick(this.selectedSample);
       }
       this.#draw();
+      this.#drawOverlay();
     };
   }
 
@@ -305,10 +310,15 @@ class Chart {
       this.pixelBounds,
       sample.point
     );
-    const grd = this.ctx.createRadialGradient(...pLoc, 0, ...pLoc, this.margin);
+    const grd = this.overlayCtx.createRadialGradient(
+      ...pLoc,
+      0,
+      ...pLoc,
+      this.margin
+    );
     grd.addColorStop(0, color);
     grd.addColorStop(1, "rgba(255,255,255,0)");
-    graphics.drawPoint(this.ctx, pLoc, grd, this.margin * 2);
+    graphics.drawPoint(this.overlayCtx, pLoc, grd, this.margin * 2);
     this.#drawSamples([sample], this.overlayCtx);
   }
 
