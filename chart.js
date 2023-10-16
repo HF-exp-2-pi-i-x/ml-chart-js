@@ -1,24 +1,41 @@
 class Chart {
   constructor(container, samples, options, onclick = null) {
     this.samples = samples;
+
     this.axesLabels = options.axesLabels;
     this.styles = options.styles;
     this.icon = options.icon;
     this.onClick = onclick;
+    this.hideSamples = options.hideSamples;
+    this.bg = options.bg;
+
+    if (this.bg) {
+      this.bg.onload = () => this.#draw();
+      this.bg.onerror = () => (this.bg = null);
+    }
+
+    Object.values(this.styles).forEach(
+      (s) => (s.image.onload = () => this.#draw())
+    );
 
     this.canvas = document.createElement("canvas");
     this.canvas.width = options.size;
     this.canvas.height = options.size;
     this.canvas.style = "background-color:white;";
     container.appendChild(this.canvas);
-    // transparent canvas over chart canvas
-    this.trans = document.createElement("canvas");
-    this.trans.width = options.size;
-    this.trans.height = options.size;
-    this.trans.style = "position:absolute;left:0;top:0;z-index:2;";
-    // container.appendChild(this.trans);
 
     this.ctx = this.canvas.getContext("2d");
+
+    this.overlayCanvas = document.createElement("canvas");
+    this.overlayCanvas.width = options.size;
+    this.overlayCanvas.height = options.size;
+    this.overlayCanvas.style.position = "absolute";
+    this.overlayCanvas.style.left = "0px";
+    this.overlayCanvas.style.pointerEvents = "none";
+    container.appendChild(this.overlayCanvas);
+
+    this.overlayCtx = this.overlayCanvas.getContext("2d");
+
     this.margin = options.size * 0.1;
     this.transparency = options.transparency || 1;
 
@@ -41,9 +58,23 @@ class Chart {
     this.dataBounds = this.#getDataBounds();
     this.defaultDataBounds = this.#getDataBounds();
 
+    this.dynamicPoint = null;
+    this.nearestSamples = null;
+
     this.#draw();
 
     this.#addEventListeners();
+  }
+
+  showDynamicPoint(point, label, nearestSamples) {
+    this.dynamicPoint = { point, label };
+    this.nearestSamples = nearestSamples;
+    this.#drawOverlay();
+  }
+
+  hideDynamicPoint() {
+    this.dynamicPoint = null;
+    this.#drawOverlay();
   }
 
   #addEventListeners() {
@@ -65,7 +96,6 @@ class Chart {
         );
         const newOffset = math.add(dataTrans.offset, dragInfo.offset);
         this.#updateDataBounds(newOffset, dataTrans.scale);
-        // this.#draw();
       }
       const pLoc = this.#getMouse(evt);
       const pPoints = this.samples.map((s) =>
@@ -76,15 +106,15 @@ class Chart {
       const dist = math.distance(pPoints[index], pLoc);
       if (dist < this.margin / 2) {
         this.hoveredSample = nearest;
-        // const { ctx, dataBounds, pixelBounds } = this;
-        // const pLoc = math.remapPoint(dataBounds, pixelBounds, nearest.point);
-        // graphics.drawImage(ctx, this.styles.transparent, pLoc);
-        // this.#drawSamples([nearest]);
       } else {
         this.hoveredSample = null;
-        // this.#draw();
       }
-      // this.#draw();
+      if (dragInfo.dragging) {
+        this.#draw();
+        this.#drawOverlay();
+      } else {
+        this.#drawOverlay();
+      }
     };
     canvas.onmouseup = () => {
       dataTrans.offset = math.add(dataTrans.offset, dragInfo.offset);
@@ -185,7 +215,7 @@ class Chart {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.globalAlpha = this.transparency;
-    this.#drawSamples(this.samples);
+    this.#drawSamples(this.samples, ctx);
     ctx.globalAlpha = 1;
 
     if (this.hoveredSample) {
@@ -197,9 +227,76 @@ class Chart {
     this.#drawAxes();
   }
 
+  #drawOverlay() {
+    this.overlayCtx.clearRect(
+      0,
+      0,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height
+    );
+
+    if (this.hoveredSample) {
+      this.#emphasizeSample(this.hoveredSample);
+    }
+
+    if (this.selectedSample) {
+      if (this.nearestSamples && !this.dynamicPoint) {
+        const pixelLoc = math.remapPoint(
+          this.dataBounds,
+          this.pixelBounds,
+          this.selectedSample.point
+        );
+        this.#showNearest(pixelLoc);
+      }
+      this.#emphasizeSample(this.selectedSample, "yellow");
+    }
+    if (this.dynamicPoint) {
+      const { point, label } = this.dynamicPoint;
+      const pixelLoc = math.remapPoint(
+        this.dataBounds,
+        this.pixelBounds,
+        point
+      );
+      graphics.drawPoint(
+        this.overlayCtx,
+        pixelLoc,
+        "rgba(255,255,255,0.7)",
+        10000000
+      );
+      if (this.nearestSamples) {
+        this.#showNearest(pixelLoc);
+      }
+      graphics.drawImage(this.overlayCtx, this.styles[label].image, pixelLoc);
+    }
+    this.#drawAxes(this.overlayCtx);
+  }
+
+  #showNearest(pixelLoc) {
+    if (this.samples[0].truth) {
+      return;
+    }
+    this.overlayCtx.strokeStyle = "black";
+    for (const sample of this.nearestSamples) {
+      const point = math.remapPoint(
+        this.dataBounds,
+        this.pixelBounds,
+        sample.point
+      );
+      this.overlayCtx.beginPath();
+      this.overlayCtx.moveTo(...pixelLoc);
+      this.overlayCtx.lineTo(...point);
+      this.overlayCtx.stroke();
+    }
+  }
+
   selectSample(sample) {
     this.selectedSample = sample;
-    this.#draw();
+    if (sample && sample.nearestSamples) {
+      this.nearestSamples = sample.nearestSamples;
+    } else {
+      this.nearestSamples = null;
+    }
+    this.#drawOverlay();
   }
 
   #emphasizeSample(sample, color = "white") {
@@ -212,7 +309,7 @@ class Chart {
     grd.addColorStop(0, color);
     grd.addColorStop(1, "rgba(255,255,255,0)");
     graphics.drawPoint(this.ctx, pLoc, grd, this.margin * 2);
-    this.#drawSamples([sample]);
+    this.#drawSamples([sample], this.overlayCtx);
   }
 
   #drawAxes() {
@@ -297,24 +394,30 @@ class Chart {
     ctx.restore();
   }
 
-  #drawSamples(samples) {
-    const { ctx, dataBounds, pixelBounds } = this;
+  #drawSamples(samples, ctx) {
+    if (this.hideSamples) {
+      return;
+    }
+    const { dataBounds, pixelBounds } = this;
     for (const sample of samples) {
-      const { point, label } = sample;
+      let { point, truth, label } = sample;
+      if (!truth) {
+        truth = label;
+      }
       const pixelLoc = math.remapPoint(dataBounds, pixelBounds, point);
       switch (this.icon) {
         case "image":
-          graphics.drawImage(ctx, this.styles[label].image, pixelLoc);
+          graphics.drawImage(ctx, this.styles[truth].image, pixelLoc);
           break;
         case "text":
           graphics.drawText(ctx, {
-            text: this.styles[label].text,
+            text: this.styles[truth].text,
             loc: pixelLoc,
             size: 20,
           });
           break;
         default:
-          graphics.drawPoint(ctx, pixelLoc, this.styles[label].color);
+          graphics.drawPoint(ctx, pixelLoc, this.styles[truth].color);
           break;
       }
     }
